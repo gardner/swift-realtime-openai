@@ -188,15 +188,20 @@ extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 
 	public func peerConnection(_: LKRTCPeerConnection, didChange newState: LKRTCIceConnectionState) {
 		print("ICE Connection State changed to: \(newState)")
+
+		if newState == .failed {
+			Task { @MainActor in status = .disconnected }
+		}
 	}
 }
 
 extension WebRTCConnector: LKRTCDataChannelDelegate {
 	public func dataChannel(_: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
-		do { try stream.yield(decoder.decode(ServerEvent.self, from: buffer.data)) }
-		catch {
+		do {
+			try stream.yield(decoder.decode(ServerEvent.self, from: buffer.data))
+		} catch {
 			print("Failed to decode server event: \(String(data: buffer.data, encoding: .utf8) ?? "<invalid utf8>")")
-			stream.finish(throwing: error)
+			print("Continuing after decode failure: \(error)")
 		}
 	}
 

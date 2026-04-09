@@ -43,25 +43,27 @@ public indirect enum JSONSchema: Equatable, Hashable, Sendable {
 		}
 	}
 
-	func withDescription(_: String?) -> JSONSchema {
+	// AIDEV-NOTE: Positional destructuring must match enum definition order:
+	// (multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description)
+	func withDescription(_ newDescription: String?) -> JSONSchema {
 		switch self {
-			case .null: return .null(description: description)
-			case .boolean: return .boolean(description: description)
-			case let .anyOf(cases, _): return .anyOf(cases, description: description)
-			case let .enum(cases, _): return .enum(cases: cases, description: description)
-			case let .object(properties, _): return .object(properties: properties, description: description)
-			case let .string(pattern, format, _): return .string(pattern: pattern, format: format, description: description)
+			case .null: return .null(description: newDescription)
+			case .boolean: return .boolean(description: newDescription)
+			case let .anyOf(cases, _): return .anyOf(cases, description: newDescription)
+			case let .enum(cases, _): return .enum(cases: cases, description: newDescription)
+			case let .object(properties, _): return .object(properties: properties, description: newDescription)
+			case let .string(pattern, format, _): return .string(pattern: pattern, format: format, description: newDescription)
 			case let .array(of: items, minItems, maxItems, _):
-				return .array(of: items, minItems: minItems, maxItems: maxItems, description: description)
-			case let .number(multipleOf, maximum, exclusiveMaximum, minimum, exclusiveMinimum, _):
+				return .array(of: items, minItems: minItems, maxItems: maxItems, description: newDescription)
+			case let .number(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, _):
 				return .number(
 					multipleOf: multipleOf, minimum: minimum, exclusiveMinimum: exclusiveMinimum,
-					maximum: maximum, exclusiveMaximum: exclusiveMaximum, description: description
+					maximum: maximum, exclusiveMaximum: exclusiveMaximum, description: newDescription
 				)
-			case let .integer(multipleOf, maximum, exclusiveMaximum, minimum, exclusiveMinimum, _):
+			case let .integer(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, _):
 				return .integer(
 					multipleOf: multipleOf, minimum: minimum, exclusiveMinimum: exclusiveMinimum,
-					maximum: maximum, exclusiveMaximum: exclusiveMaximum, description: description
+					maximum: maximum, exclusiveMaximum: exclusiveMaximum, description: newDescription
 				)
 		}
 	}
@@ -107,7 +109,9 @@ extension JSONSchema: Codable {
 				if let description { try container.encode(description, forKey: .description) }
 				if let minItems = minItems { try container.encode(minItems, forKey: .minItems) }
 				if let maxItems = maxItems { try container.encode(maxItems, forKey: .maxItems) }
-			case let .number(multipleOf, maximum, exclusiveMaximum, minimum, exclusiveMinimum, description):
+			// AIDEV-NOTE: Positional destructuring must match enum definition order:
+			// (multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description)
+			case let .number(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description):
 				try container.encode("number", forKey: .type)
 				if let minimum = minimum { try container.encode(minimum, forKey: .minimum) }
 				if let maximum = maximum { try container.encode(maximum, forKey: .maximum) }
@@ -115,7 +119,7 @@ extension JSONSchema: Codable {
 				if let multipleOf = multipleOf { try container.encode(multipleOf, forKey: .multipleOf) }
 				if let exclusiveMaximum = exclusiveMaximum { try container.encode(exclusiveMaximum, forKey: .exclusiveMaximum) }
 				if let exclusiveMinimum = exclusiveMinimum { try container.encode(exclusiveMinimum, forKey: .exclusiveMinimum) }
-			case let .integer(multipleOf, maximum, exclusiveMaximum, minimum, exclusiveMinimum, description):
+			case let .integer(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description):
 				try container.encode("integer", forKey: .type)
 				if let minimum = minimum { try container.encode(minimum, forKey: .minimum) }
 				if let maximum = maximum { try container.encode(maximum, forKey: .maximum) }

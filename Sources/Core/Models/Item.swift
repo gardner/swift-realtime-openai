@@ -1,7 +1,7 @@
 import Foundation
 import MetaCodable
 
-@Codable @CodedAt("type") public enum Item: Identifiable, Equatable, Hashable, Sendable {
+public enum Item: Identifiable, Equatable, Hashable, Sendable {
 	public enum Status: String, Equatable, Hashable, Codable, Sendable {
 		case completed, incomplete, inProgress = "in_progress"
 	}
@@ -321,27 +321,21 @@ import MetaCodable
 	case message(Message)
 
 	/// A function call item in a Realtime conversation.
-	@CodedAs("function_call")
 	case functionCall(FunctionCall)
 
 	/// A function call output item in a Realtime conversation.
-	@CodedAs("function_call_output")
 	case functionCallOutput(FunctionCallOutput)
 
 	/// A Realtime item representing an invocation of a tool on an MCP server.
-	@CodedAs("mcp_tool_call")
 	case mcpToolCall(MCPToolCall)
 
 	/// A Realtime item requesting human approval of a tool invocation.
-	@CodedAs("mcp_approval_request")
 	case mcpApprovalRequest(MCPApprovalRequest)
 
 	/// A Realtime item responding to an MCP approval request.
-	@CodedAs("mcp_approval_response")
 	case mcpApprovalResponse(MCPApprovalResponse)
 
 	/// A Realtime item listing tools available on an MCP server.
-	@CodedAs("mcp_list_tools")
 	case mcpListTools(MCPListTools)
 
 	public var id: String {
@@ -369,6 +363,202 @@ public extension Item.Message.Content {
 }
 
 // MARK: Codable implementations
+
+extension Item: Codable {
+	private enum CodingKeys: String, CodingKey {
+		case type
+	}
+
+	private struct MessageEnvelope: Codable {
+		var type: String?
+		let id: String
+		let status: Item.Status
+		let role: Item.Message.Role
+		let content: [Item.Message.Content]
+
+		init(_ message: Item.Message) {
+			type = "message"
+			id = message.id
+			status = message.status
+			role = message.role
+			content = message.content
+		}
+	}
+
+	private struct FunctionCallEnvelope: Codable {
+		var type: String?
+		let id: String
+		let status: Item.Status
+		let callId: String
+		let name: String
+		let arguments: String
+
+		init(_ functionCall: Item.FunctionCall) {
+			type = "function_call"
+			id = functionCall.id
+			status = functionCall.status
+			callId = functionCall.callId
+			name = functionCall.name
+			arguments = functionCall.arguments
+		}
+	}
+
+	private struct FunctionCallOutputEnvelope: Codable {
+		var type: String?
+		let id: String
+		let callId: String
+		let output: String
+
+		init(_ functionCallOutput: Item.FunctionCallOutput) {
+			type = "function_call_output"
+			id = functionCallOutput.id
+			callId = functionCallOutput.callId
+			output = functionCallOutput.output
+		}
+	}
+
+	private struct MCPToolCallEnvelope: Codable {
+		var type: String?
+		let id: String
+		let serverLabel: String
+		let name: String
+		let arguments: String
+		let output: String?
+		let error: Item.MCPToolCall.Error?
+		let approvalRequestId: String?
+
+		init(_ mcpToolCall: Item.MCPToolCall) {
+			type = "mcp_tool_call"
+			id = mcpToolCall.id
+			serverLabel = mcpToolCall.server
+			name = mcpToolCall.tool
+			arguments = mcpToolCall.arguments
+			output = mcpToolCall.output
+			error = mcpToolCall.error
+			approvalRequestId = mcpToolCall.approvalRequestId
+		}
+	}
+
+	private struct MCPApprovalRequestEnvelope: Codable {
+		var type: String?
+		let id: String
+		let serverLabel: String
+		let name: String
+		let arguments: String
+
+		init(_ approvalRequest: Item.MCPApprovalRequest) {
+			type = "mcp_approval_request"
+			id = approvalRequest.id
+			serverLabel = approvalRequest.server
+			name = approvalRequest.tool
+			arguments = approvalRequest.arguments
+		}
+	}
+
+	private struct MCPApprovalResponseEnvelope: Codable {
+		var type: String?
+		let id: String
+		let approvalRequestId: String
+		let approve: Bool
+		let reason: String?
+
+		init(_ approvalResponse: Item.MCPApprovalResponse) {
+			type = "mcp_approval_response"
+			id = approvalResponse.id
+			approvalRequestId = approvalResponse.approvalRequestId
+			approve = approvalResponse.approve
+			reason = approvalResponse.reason
+		}
+	}
+
+	private struct MCPListToolsEnvelope: Codable {
+		var type: String?
+		let id: String
+		let serverLabel: String
+		let tools: [Item.MCPListTools.Tool]
+
+		init(_ listTools: Item.MCPListTools) {
+			type = "mcp_list_tools"
+			id = listTools.id
+			serverLabel = listTools.server
+			tools = listTools.tools
+		}
+	}
+
+	public init(from decoder: any Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		let type = try container.decode(String.self, forKey: .type)
+
+		switch type {
+			case "message":
+				let envelope = try MessageEnvelope(from: decoder)
+				self = .message(.init(id: envelope.id, status: envelope.status, role: envelope.role, content: envelope.content))
+			case "function_call":
+				let envelope = try FunctionCallEnvelope(from: decoder)
+				self = .functionCall(.init(id: envelope.id, status: envelope.status, callId: envelope.callId, name: envelope.name, arguments: envelope.arguments))
+			case "function_call_output":
+				let envelope = try FunctionCallOutputEnvelope(from: decoder)
+				self = .functionCallOutput(.init(id: envelope.id, callId: envelope.callId, output: envelope.output))
+			case "mcp_tool_call", "mcp_call":
+				let envelope = try MCPToolCallEnvelope(from: decoder)
+				self = .mcpToolCall(
+					.init(
+						id: envelope.id,
+						server: envelope.serverLabel,
+						tool: envelope.name,
+						arguments: envelope.arguments,
+						output: envelope.output,
+						error: envelope.error,
+						approvalRequestId: envelope.approvalRequestId
+					)
+				)
+			case "mcp_approval_request":
+				let envelope = try MCPApprovalRequestEnvelope(from: decoder)
+				self = .mcpApprovalRequest(
+					.init(
+						id: envelope.id,
+						server: envelope.serverLabel,
+						tool: envelope.name,
+						arguments: envelope.arguments
+					)
+				)
+			case "mcp_approval_response":
+				let envelope = try MCPApprovalResponseEnvelope(from: decoder)
+				self = .mcpApprovalResponse(
+					.init(
+						id: envelope.id,
+						approvalRequestId: envelope.approvalRequestId,
+						approve: envelope.approve,
+						reason: envelope.reason
+					)
+				)
+			case "mcp_list_tools":
+				let envelope = try MCPListToolsEnvelope(from: decoder)
+				self = .mcpListTools(.init(id: envelope.id, server: envelope.serverLabel, tools: envelope.tools))
+			default:
+				throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown item type: \(type)")
+		}
+	}
+
+	public func encode(to encoder: any Encoder) throws {
+		switch self {
+			case let .message(message):
+				try MessageEnvelope(message).encode(to: encoder)
+			case let .functionCall(functionCall):
+				try FunctionCallEnvelope(functionCall).encode(to: encoder)
+			case let .functionCallOutput(functionCallOutput):
+				try FunctionCallOutputEnvelope(functionCallOutput).encode(to: encoder)
+			case let .mcpToolCall(mcpToolCall):
+				try MCPToolCallEnvelope(mcpToolCall).encode(to: encoder)
+			case let .mcpApprovalRequest(mcpApprovalRequest):
+				try MCPApprovalRequestEnvelope(mcpApprovalRequest).encode(to: encoder)
+			case let .mcpApprovalResponse(mcpApprovalResponse):
+				try MCPApprovalResponseEnvelope(mcpApprovalResponse).encode(to: encoder)
+			case let .mcpListTools(mcpListTools):
+				try MCPListToolsEnvelope(mcpListTools).encode(to: encoder)
+		}
+	}
+}
 
 extension Item.ContentPart: Codable {
 	private enum CodingKeys: String, CodingKey {

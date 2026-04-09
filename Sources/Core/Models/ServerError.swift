@@ -1,4 +1,4 @@
-public struct ServerError: Codable, Equatable, Sendable {
+public struct ServerError: Codable, Equatable, Hashable, Sendable {
 	/// The type of error (e.g., "invalid_request_error", "server_error").
 	public let type: String
 

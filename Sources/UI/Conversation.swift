@@ -176,8 +176,10 @@ private extension Conversation {
 				if let sessionUpdateCallback { try updateSession(withChanges: sessionUpdateCallback) }
 			case let .sessionUpdated(_, session):
 				self.session = session
-			case let .conversationItemCreated(_, item, _):
-				entries.append(item)
+			case let .conversationItemCreated(_, item, previousItemId),
+				let .conversationItemAdded(_, item, previousItemId),
+				let .conversationItemDone(_, item, previousItemId):
+				upsertEvent(item, after: previousItemId)
 			case let .conversationItemDeleted(_, itemId):
 				entries.removeAll { $0.id == itemId }
 			case let .conversationItemInputAudioTranscriptionCompleted(_, itemId, contentIndex, transcript, _, _):
@@ -244,14 +246,28 @@ private extension Conversation {
 				isModelSpeaking = true
 			case .outputAudioBufferStopped:
 				isModelSpeaking = false
-			case let .responseOutputItemDone(_, _, _, item):
-				updateEvent(id: item.id) { message in
-					guard case let .message(newMessage) = item else { return }
-
-					message = newMessage
-				}
+			case let .responseOutputItemAdded(_, _, _, item),
+				let .responseOutputItemDone(_, _, _, item):
+				upsertEvent(item)
 			default: break
 		}
+	}
+
+	func upsertEvent(_ item: Item, after previousItemId: String? = nil) {
+		if let index = entries.firstIndex(where: { $0.id == item.id }) {
+			entries[index] = item
+			return
+		}
+
+		guard
+			let previousItemId,
+			let previousIndex = entries.firstIndex(where: { $0.id == previousItemId })
+		else {
+			entries.append(item)
+			return
+		}
+
+		entries.insert(item, at: entries.index(after: previousIndex))
 	}
 
 	func updateEvent(id: String, modifying closure: (inout Item.Message) -> Void) {

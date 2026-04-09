@@ -44,11 +44,16 @@ public final class WebSocketConnector: NSObject, Connector, Sendable {
 					let message = try await webSocket.receive()
 
 					guard case let .string(text) = message, let data = text.data(using: .utf8) else {
-						stream.finish(throwing: RealtimeAPI.Error.invalidMessage)
+						print("Ignoring unsupported websocket message: \(message)")
 						continue
 					}
 
-					try stream.yield(decoder.decode(ServerEvent.self, from: data))
+					do {
+						try stream.yield(decoder.decode(ServerEvent.self, from: data))
+					} catch {
+						print("Failed to decode server event: \(text)")
+						print("Continuing after decode failure: \(error)")
+					}
 				} catch {
 					stream.finish(throwing: error)
 					isActive = false
