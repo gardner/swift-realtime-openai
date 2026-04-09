@@ -231,12 +231,20 @@ private extension Conversation {
 					message.content[contentIndex] = .audio(.init(audio: (audio.audio?.data ?? Data()) + delta.data, transcript: audio.transcript))
 				}
 			case let .responseFunctionCallArgumentsDelta(_, _, itemId, _, _, delta):
-				updateEvent(id: itemId) { functionCall in
+				updateEvent(id: itemId) { (functionCall: inout Item.FunctionCall) in
 					functionCall.arguments.append(delta)
 				}
 			case let .responseFunctionCallArgumentsDone(_, _, itemId, _, _, arguments):
-				updateEvent(id: itemId) { functionCall in
+				updateEvent(id: itemId) { (functionCall: inout Item.FunctionCall) in
 					functionCall.arguments = arguments
+				}
+			case let .responseMCPCallArgumentsDelta(_, _, itemId, _, delta, _):
+				updateEvent(id: itemId) { (mcpToolCall: inout Item.MCPToolCall) in
+					mcpToolCall.arguments.append(delta)
+				}
+			case let .responseMCPCallArgumentsDone(_, _, itemId, _, arguments):
+				updateEvent(id: itemId) { (mcpToolCall: inout Item.MCPToolCall) in
+					mcpToolCall.arguments = arguments
 				}
 			case .inputAudioBufferSpeechStarted:
 				isUserSpeaking = true
@@ -288,5 +296,15 @@ private extension Conversation {
 		closure(&functionCall)
 
 		entries[index] = .functionCall(functionCall)
+	}
+
+	func updateEvent(id: String, modifying closure: (inout Item.MCPToolCall) -> Void) {
+		guard let index = entries.firstIndex(where: { $0.id == id }), case var .mcpToolCall(mcpToolCall) = entries[index] else {
+			return
+		}
+
+		closure(&mcpToolCall)
+
+		entries[index] = .mcpToolCall(mcpToolCall)
 	}
 }
