@@ -41,7 +41,7 @@ import MetaCodable
 		}
 	}
 
-	@Codable public struct MCP: Equatable, Hashable, Sendable {
+	public struct MCP: Equatable, Hashable, Sendable {
 		public enum Connector: String, Equatable, Hashable, Codable, Sendable {
 			case gmail = "connector_gmail"
 			case dropbox = "connector_dropbox"
@@ -149,7 +149,7 @@ extension Tool.Choice: Codable {
 		case name
 		case mode
 		case tools
-		case serverLabel = "server_label"
+		case serverLabel
 	}
 
 	public func encode(to encoder: any Encoder) throws {
@@ -206,7 +206,7 @@ extension Tool.MCP.RequireApproval: Codable {
 	}
 
 	private struct ToolList: Codable {
-		var tool_names: [String]
+		var toolNames: [String]
 	}
 
 	public func encode(to encoder: any Encoder) throws {
@@ -217,10 +217,10 @@ extension Tool.MCP.RequireApproval: Codable {
 			case let .granular(always, never):
 				var container = encoder.container(keyedBy: CodingKeys.self)
 				if let always {
-					try container.encode(ToolList(tool_names: always), forKey: .always)
+					try container.encode(ToolList(toolNames: always), forKey: .always)
 				}
 				if let never {
-					try container.encode(ToolList(tool_names: never), forKey: .never)
+					try container.encode(ToolList(toolNames: never), forKey: .never)
 				}
 		}
 	}
@@ -233,8 +233,47 @@ extension Tool.MCP.RequireApproval: Codable {
 
 		let container = try decoder.container(keyedBy: CodingKeys.self)
 		self = try .granular(
-			always: container.decode(ToolList?.self, forKey: .always)?.tool_names,
-			never: container.decode(ToolList?.self, forKey: .never)?.tool_names
+			always: container.decode(ToolList?.self, forKey: .always)?.toolNames,
+			never: container.decode(ToolList?.self, forKey: .never)?.toolNames
 		)
+	}
+}
+
+extension Tool.MCP: Codable {
+	private enum CodingKeys: String, CodingKey {
+		case serverLabel
+		case serverUrl
+		case connectorId
+		case authorization
+		case allowedTools
+		case headers
+		case requireApproval
+		case serverDescription
+	}
+
+	public init(from decoder: any Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+
+		label = try container.decode(String.self, forKey: .serverLabel)
+		url = try container.decodeIfPresent(URL.self, forKey: .serverUrl)
+		connector = try container.decodeIfPresent(Connector.self, forKey: .connectorId)
+		authorization = try container.decodeIfPresent(String.self, forKey: .authorization)
+		allowedTools = try container.decodeIfPresent([String].self, forKey: .allowedTools)
+		headers = try container.decodeIfPresent([String: String].self, forKey: .headers)
+		requireApproval = try container.decodeIfPresent(RequireApproval.self, forKey: .requireApproval)
+		description = try container.decodeIfPresent(String.self, forKey: .serverDescription)
+	}
+
+	public func encode(to encoder: any Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+
+		try container.encode(label, forKey: .serverLabel)
+		try container.encodeIfPresent(url, forKey: .serverUrl)
+		try container.encodeIfPresent(connector, forKey: .connectorId)
+		try container.encodeIfPresent(authorization, forKey: .authorization)
+		try container.encodeIfPresent(allowedTools, forKey: .allowedTools)
+		try container.encodeIfPresent(headers, forKey: .headers)
+		try container.encodeIfPresent(requireApproval, forKey: .requireApproval)
+		try container.encodeIfPresent(description, forKey: .serverDescription)
 	}
 }
